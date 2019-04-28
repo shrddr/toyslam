@@ -50,21 +50,22 @@ def hamming_distance(a, b):
     return np.count_nonzero((np.bitwise_xor(a,b) & r) != 0)
 
 if __name__ == '__main__':
-#    cap = cv2.VideoCapture('./videos/1.MP4')
-#    cap = cv2.VideoCapture('./videos/5.MP4')
-#    cap = cv2.VideoCapture('./videos/test_ohio.mp4')
-#    cap = cv2.VideoCapture('./videos/test_drone.mp4')
-#    cap = cv2.VideoCapture('./videos/test_countryroad.mp4')
-#    cap = cv2.VideoCapture('./videos/test_countryroad_reverse.mp4')
-#    cap = cv2.VideoCapture('./videos/test_kitti984.mp4')
-#    cap = cv2.VideoCapture('./videos/test_kitti984_reverse.mp4')
-    cap = cv2.VideoCapture('./videos/test_freiburgxyz525.mp4')
+#    cap = cv2.VideoCapture('../videos/1.MP4')
+#    cap = cv2.VideoCapture('../videos/5.MP4')
+    cap = cv2.VideoCapture('../videos/test_ohio.mp4')
+#    cap = cv2.VideoCapture('../videos/test_drone.mp4')
+#    cap = cv2.VideoCapture('../videos/test_countryroad.mp4')
+#    cap = cv2.VideoCapture('../videos/test_countryroad_reverse.mp4')
+#    cap = cv2.VideoCapture('../videos/test_kitti984.mp4')
+#    cap = cv2.VideoCapture('../videos/test_kitti984_reverse.mp4')
+#    cap = cv2.VideoCapture('../videos/test_freiburgxyz525.mp4')
 
     W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    F = 500
-    MIRROR = not True
-    REVERSE = False
+    F = 500 # focal distance of camera
+    MIRROR = not True # try to recover points mis-triangulated behind the camera
+    REVERSE = False # hack for camera moving backwards
+    SBP_PX = 5 # max euclidian distance to search by projection
     
     K = np.array([[F, 0, W/2],
                   [0, F, H/2],
@@ -96,32 +97,33 @@ if __name__ == '__main__':
         pts_old = f_old.kps[idx_old]
         pts_new = f_new.kps[idx_new]
         
-        # optimize pose only
+        count_sbp = 0
+        projs = None
         if f_new.id >= 2:
+            # optimize pose only
             c.optimize(K, frames=1, fix_points=True)
             Rt = np.dot(f_new.pose, np.linalg.inv(f_old.pose))
         
-        count_sbp = 0
-        for p in c.points:
-            proj = p.project(f_new.pose, K)
-            q = f_new.kd.query_ball_point(proj, 5)
-            for m_id in q:
-                if f_new.pts[m_id] is None:
-                    dist = cv2.norm(p.orb(), f_new.des[m_id], cv2.NORM_HAMMING)
-#                    print(proj[0], proj[1], dist)
-                    if dist < 32:
-#                        p.addObservation(f_new, m_id)
-#                        print("hdist", dist, "edist", np.linalg.norm(proj-f_new.kd.data[m_id]))
-                        count_sbp += 1
-    
-#        for p in c.points:
-#            
-#            projected = f_est.w2i.dot(np.hstack([p_est, [1]])) # only works because is VertexCam
-#            projected = projected[:2] / projected[2] # don't forget to homo
-#            errors.append(np.linalg.norm(measured-projected))
+            cloud_points = np.array([p.pt4d for p in c.points])
+            KP = np.dot(K, np.linalg.inv(f_new.pose)[:3])
+            projs = np.dot(KP, cloud_points.T).T
+            projs = projs[:,:2] / projs[:,2:]
+            
+            # search by projection
+            for i,p in enumerate(c.points):
+                proj = projs[i]
+                q = f_new.kd.query_ball_point(proj, 5)
+                for m_id in q:
+                    if f_new.pts[m_id] is None:
+                        dist = cv2.norm(p.orb(), f_new.des[m_id], cv2.NORM_HAMMING)
+                        if dist < 32:
+                            p.addObservation(f_new, m_id)
+                            count_sbp += 1
         
         # local
         pts4d = triangulate(np.eye(4), Rt, pts_old, pts_new, MIRROR)
+        if len(pts4d) == 0:
+            print(Rt, pts_old, pts_new)
         # to world
         pts4d = np.dot(f_old.pose, pts4d.T).T
         # only create new Point if seen for the first time
@@ -149,11 +151,17 @@ if __name__ == '__main__':
 
         c.show()
         
-        kpus_old = f_old.kpus[idx_old]
-        kpus_new = f_new.kpus[idx_new]
-        for kpu_old, kpu_new in zip(kpus_old, kpus_new):
-            cv2.circle(img, ipair(kpu_new), color=(0,0,255), radius=5)
-            cv2.line(img, ipair(kpu_new), ipair(kpu_old), color=(0,0,255))
+        for i_old, i_new in zip(idx_old, idx_new):
+            kpu_old = f_old.kpus[i_old]
+            kpu_new = f_new.kpus[i_new]
+            if f_new.pts[i_new] is not None:
+                cv2.circle(img, ipair(kpu_new), color=(0,255,0), radius=5)
+                cv2.line(img, ipair(kpu_new), ipair(kpu_old), color=(0,255,0))
+            else:
+                cv2.circle(img, ipair(kpu_new), color=(0,0,255), radius=5)
+#        if projs is not None:
+#            for proj in projs:
+#                cv2.circle(img, ipair(proj), color=(255,0,0), radius=3)
          
         cv2.imshow('cv2', img)
 #        time.sleep(3.5)

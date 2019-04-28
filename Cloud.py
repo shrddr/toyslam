@@ -134,8 +134,7 @@ class Cloud():
             vp.set_marginalized(True)
             vp.set_fixed(fix_points)
             opt.add_vertex(vp)
-            
-            
+               
             # edge connects every camera with every point
             for f in p.frames:
                 edge = g2o.EdgeProjectP2MC()
@@ -179,7 +178,7 @@ class Cloud():
             vp = opt.vertex(PT_OFFSET + p.id)
             p_est = vp.estimate()
             
-            if (len(p.frames) <= 2) and (p.frames[-1] not in local_frames):
+            if (len(p.frames) <= 5) and (p.frames[-1] not in local_frames):
                 p.delete()
                 continue
             
@@ -189,8 +188,7 @@ class Cloud():
                 measured = f.kpus[f.pts.index(p)]
                 projected = f_est.w2i.dot(np.hstack([p_est, [1]])) # only works because is VertexCam
                 projected = projected[:2] / projected[2] # don't forget to homo
-                errors.append(np.linalg.norm(measured-projected))
-            
+                errors.append(np.linalg.norm(measured-projected))     
             error = np.mean(errors) # mean of squares - over all frames
             if error > 1.0: # px
 #                print(f"error {error}, dropping")
@@ -199,6 +197,6 @@ class Cloud():
                 p.pt3d = np.array(p_est)
                 new_points.append(p)
                 
-        print("Dropping: ", len(self.points)-len(new_points), "Remaining", len(new_points))
+        print("Dropping:", len(self.points)-len(new_points), ", Remaining:", len(new_points))
         self.points = new_points
         

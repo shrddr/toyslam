@@ -11,12 +11,6 @@ class Point():
         cloud.points_newid += 1
             
         cloud.points.append(self)
-    
-    def project(self, pose, K):
-        local = np.dot(np.linalg.inv(pose), self.pt4d)
-        projected = np.dot(K, local[:3])
-        projected = projected[:2] / projected[2]
-        return projected
         
     def orb(self):
         f = self.frames[-1]

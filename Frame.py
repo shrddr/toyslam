@@ -76,7 +76,6 @@ def matchFrames(old, new, reverse=False):
 
 class Frame():
     def __init__(self, img, K):
-#        self.diag = np.linalg.norm(img.shape[:2])
         self.pose = np.eye(4)
 #        self.pose[2,3] = 100
         self.orb = cv2.ORB_create()
