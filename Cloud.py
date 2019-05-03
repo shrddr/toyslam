@@ -126,6 +126,7 @@ class Cloud():
         
         # a vertex for each point in cloud
         for p in self.points:
+#            if p.frames[-1] not in local_frames:
             if not any([f in local_frames for f in p.frames]):
                 continue
             vp = g2o.VertexSBAPointXYZ()
@@ -172,15 +173,15 @@ class Cloud():
         # add back or cull
         for p in self.points:
             vp = opt.vertex(PT_OFFSET + p.id)
-            if vp is None: #fixed point
+            if vp is None: # not updated
                 new_points.append(p)
                 continue
             vp = opt.vertex(PT_OFFSET + p.id)
             p_est = vp.estimate()
             
-            if (len(p.frames) <= 5) and (p.frames[-1] not in local_frames):
-                p.delete()
-                continue
+#            if (len(p.frames) <= 5) and (p.frames[-1] not in local_frames):
+#                p.delete()
+#                continue
             
             errors = []
             for f in p.frames:

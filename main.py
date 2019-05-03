@@ -52,17 +52,17 @@ def hamming_distance(a, b):
 if __name__ == '__main__':
 #    cap = cv2.VideoCapture('../videos/1.MP4')
 #    cap = cv2.VideoCapture('../videos/5.MP4')
-    cap = cv2.VideoCapture('../videos/test_ohio.mp4')
+#    cap = cv2.VideoCapture('../videos/test_ohio.mp4')
 #    cap = cv2.VideoCapture('../videos/test_drone.mp4')
 #    cap = cv2.VideoCapture('../videos/test_countryroad.mp4')
 #    cap = cv2.VideoCapture('../videos/test_countryroad_reverse.mp4')
 #    cap = cv2.VideoCapture('../videos/test_kitti984.mp4')
 #    cap = cv2.VideoCapture('../videos/test_kitti984_reverse.mp4')
-#    cap = cv2.VideoCapture('../videos/test_freiburgxyz525.mp4')
+    cap = cv2.VideoCapture('../videos/test_freiburgxyz525.mp4')
 
     W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    F = 500 # focal distance of camera
+    F = 300 # focal distance of camera
     MIRROR = not True # try to recover points mis-triangulated behind the camera
     REVERSE = False # hack for camera moving backwards
     SBP_PX = 5 # max euclidian distance to search by projection
@@ -108,17 +108,23 @@ if __name__ == '__main__':
             KP = np.dot(K, np.linalg.inv(f_new.pose)[:3])
             projs = np.dot(KP, cloud_points.T).T
             projs = projs[:,:2] / projs[:,2:]
-            
+
+#without SbP f73 10k
+#Points [8627 1115  221  110   25   18    7    2    3    1]
+#Frames [ 2.   4.6  7.2  9.8 12.4 15.  17.6 20.2 22.8 25.4 28. ]
+#with SbP f73 5k
+#Points [3997  583  215   82   45   33   16   12    7    3]
+#Frames [ 2.   9.2 16.4 23.6 30.8 38.  45.2 52.4 59.6 66.8 74. ]
             # search by projection
-            for i,p in enumerate(c.points):
-                proj = projs[i]
-                q = f_new.kd.query_ball_point(proj, 5)
-                for m_id in q:
-                    if f_new.pts[m_id] is None:
-                        dist = cv2.norm(p.orb(), f_new.des[m_id], cv2.NORM_HAMMING)
-                        if dist < 32:
-                            p.addObservation(f_new, m_id)
-                            count_sbp += 1
+#            for i,p in enumerate(c.points):
+#                proj = projs[i]
+#                q = f_new.kd.query_ball_point(proj, 5) # tree of kpus
+#                for m_id in q:
+#                    if f_new.pts[m_id] is None:
+#                        dist = cv2.norm(p.orb(), f_new.des[m_id], cv2.NORM_HAMMING)
+#                        if dist < 32:
+#                            p.addObservation(f_new, m_id)
+#                            count_sbp += 1
         
         # local
         pts4d = triangulate(np.eye(4), Rt, pts_old, pts_new, MIRROR)
@@ -146,9 +152,15 @@ if __name__ == '__main__':
         print(f"Adding: {sum(good_pts4d)}, By projection: {count_sbp}")
         
         if f_new.id >= 4:
-            c.optimize(K, 10)
+            c.optimize(K, frames=10)
 #            exit(0)
 
+        frames_per_point = [len(p.frames) for p in c.points]
+        hist, bins = np.histogram(frames_per_point, 10)
+            
+        print("Stats")
+        print("Points", hist)
+        print("Frames", bins)
         c.show()
         
         for i_old, i_new in zip(idx_old, idx_new):
