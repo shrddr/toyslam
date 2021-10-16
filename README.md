@@ -1,1 +1,1 @@
-simultaneous localization and mapping from geohot lifestreams
+simultaneous localization and mapping from geohot livestreams
